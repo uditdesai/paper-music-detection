@@ -10,6 +10,10 @@ upperBound = np.array([31, 255, 255])
 cam = cv2.VideoCapture(0)
 # initial frame variable
 first_frame = None
+# initial shape detection bool
+detected_shapes = False
+# list of shapes
+shapes = []
 
 # Set up opening and closing filter
 kernelOpen = np.ones((5, 5))
@@ -66,6 +70,13 @@ while True:
             cv2.putText(img, shape, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (255, 255, 255), 2)
 
+            # append to shapes array to save shape
+            if detected_shapes == False:
+                shapes.append(c)
+
+    # make detected_shapes true to only store shapes once
+    detected_shapes = True
+
     # masking image to get yellow color
     imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(imgHSV, lowerBound, upperBound)
@@ -84,6 +95,10 @@ while True:
     for i in range(len(conts)):
         x, y, w, h = cv2.boundingRect(conts[i])
         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+
+        for shape in shapes:
+            if cv2.pointPolygonTest(shape, (x+w/2, y+h/2), True) >= 0:
+                print("true")
 
     # show original frame with shapes and yellow objects
     cv2.imshow("image", img)
