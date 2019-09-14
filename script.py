@@ -14,6 +14,8 @@ first_frame = None
 detected_shapes = False
 # list of shapes
 shapes = []
+# initial interaction point
+init_inter_points = []
 
 # Set up opening and closing filter
 kernelOpen = np.ones((5, 5))
@@ -52,27 +54,27 @@ while True:
                                cv2.CHAIN_APPROX_SIMPLE)
 
     # loop through contours
-    for c in cnts:
+    new_cnts = [c for c in cnts if 1000 < cv2.contourArea(c) < 2000]
+    for c in range(len(new_cnts)):
+
         # compute the center of the contour
-        M = cv2.moments(c)
+        M = cv2.moments(new_cnts[c])
         # if going to divide by 0 then skip
         if M["m00"] != 0:
             cX = int(M["m10"] / M["m00"] * ratio)
             cY = int(M["m01"] / M["m00"] * ratio)
-        shape = sd.detect(c)
+        shape = sd.detect(new_cnts[c])
 
-        # if area not correct to detect shape, do not draw it
-        if 1000 < cv2.contourArea(c) < 2000:
-            c = c.astype("float")
-            c *= ratio
-            c = c.astype("int")
-            cv2.drawContours(img, [c], -1, (0, 255, 0), 2)
-            cv2.putText(img, shape, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, (255, 255, 255), 2)
+        new_cnts[c] = new_cnts[c].astype("float")
+        new_cnts[c] *= ratio
+        new_cnts[c] = new_cnts[c].astype("int")
+        cv2.drawContours(img, [new_cnts[c]], -1, (0, 255, 0), 2)
+        cv2.putText(img, shape, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (255, 255, 255), 2)
 
-            # append to shapes array to save shape
-            if detected_shapes == False:
-                shapes.append(c)
+        # append to shapes array to save shape
+        if detected_shapes == False:
+            shapes.append({"shapenum": c, "shape": new_cnts[c]})
 
     # make detected_shapes true to only store shapes once
     detected_shapes = True
@@ -97,8 +99,8 @@ while True:
         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
 
         for shape in shapes:
-            if cv2.pointPolygonTest(shape, (x+w/2, y+h/2), True) >= 0:
-                print("true")
+            if cv2.pointPolygonTest(shape["shape"], (x+w/2, y+h/2), True) >= 0:
+                print((x+w/2, y+h/2, shape["shapenum"]))
 
     # show original frame with shapes and yellow objects
     cv2.imshow("image", img)
