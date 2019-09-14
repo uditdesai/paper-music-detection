@@ -21,6 +21,10 @@ init_inter_points = []
 kernelOpen = np.ones((5, 5))
 kernelClose = np.ones((20, 20))
 
+fingerExists = False
+
+buffer = None
+
 # Infinite for loop
 while True:
 
@@ -32,29 +36,33 @@ while True:
         first_frame = img
         continue
 
+    if fingerExists == False:
+        buffer = img
+
     # get original height and width of shape
     height, width, layers = img.shape
     # get smaller frame to capture shapes
-    imgSmall = cv2.resize(first_frame, (int(width/3), int(height/3)))
+    imgSmall = cv2.resize(buffer, (int(width/4), int(height/4)))
     # resize main frame so its easier to see
-    img = cv2.resize(img, (int(width/1.5), int(height/1.5)))
+    img = cv2.resize(img, (int(width), int(height)))
+    img_copy = img
     # get ratio to multiply shape contours by when drawing them
     ratio = img.shape[0] / float(imgSmall.shape[0])
 
     # transform smaller frame to find shape contours
     gray = cv2.cvtColor(imgSmall, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY_INV)[1]
+    thresh = cv2.threshold(blurred, 185, 255, cv2.THRESH_BINARY_INV)[1]
 
     # initialize shape detecting class
     sd = ShapeDetector()
 
     # get contours from transformed small frame
-    cnts, h = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
-                               cv2.CHAIN_APPROX_SIMPLE)
+    cnts, h = cv2.findContours(thresh.copy(), cv2.RETR_CCOMP,
+                               cv2.CHAIN_APPROX_NONE)
 
     # loop through contours
-    new_cnts = [c for c in cnts if 1000 < cv2.contourArea(c) < 2000]
+    new_cnts = [c for c in cnts if 300 < cv2.contourArea(c) < 4000]
     for c in range(len(new_cnts)):
 
         # compute the center of the contour
@@ -76,8 +84,8 @@ while True:
         if detected_shapes == False:
             shapes.append({"shapenum": c, "shape": new_cnts[c]})
 
-    # make detected_shapes true to only store shapes once
-    detected_shapes = True
+        # make detected_shapes true to only store shapes once
+        detected_shapes = True
 
     # masking image to get yellow color
     imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -92,6 +100,11 @@ while True:
     conts, h = cv2.findContours(
         maskFinal.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
+    if len(conts) > 0:
+        fingerExists = True
+    else:
+        fingerExists = False
+
     # draw yellow color rectangle
     cv2.drawContours(img, conts, -1, (255, 0, 0), 3)
     for i in range(len(conts)):
@@ -100,10 +113,17 @@ while True:
 
         for shape in shapes:
             if cv2.pointPolygonTest(shape["shape"], (x+w/2, y+h/2), True) >= 0:
-                print((x+w/2, y+h/2, shape["shapenum"]))
+                if len(init_inter_points) != 0:
+                    if init_inter_points[-1][2] != shape["shapenum"]:
+                        init_inter_points.append(
+                            ((x+w/2, y+h/2, shape["shapenum"])))
+                else:
+                    init_inter_points.append(
+                        ((x+w/2, y+h/2, shape["shapenum"])))
 
     # show original frame with shapes and yellow objects
     cv2.imshow("image", img)
+    # cv2.imshow("thresh", thresh)
     cv2.waitKey(1)
 
 cam.release()
