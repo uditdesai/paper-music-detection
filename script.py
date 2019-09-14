@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 from shapedetector import ShapeDetector
+from playsound import playsound
+
 
 # lower and upper bound for yellow color in HSV
 lowerBound = np.array([29, 63, 100])
@@ -22,6 +24,7 @@ kernelOpen = np.ones((5, 5))
 kernelClose = np.ones((20, 20))
 
 fingerExists = False
+fingerInShape = False
 
 buffer = None
 
@@ -58,10 +61,12 @@ while True:
     sd = ShapeDetector()
 
     # get contours from transformed small frame
-    cnts, h = cv2.findContours(thresh.copy(), cv2.RETR_CCOMP,
+    cnts, h = cv2.findContours(thresh.copy(), cv2.RETR_LIST,
                                cv2.CHAIN_APPROX_NONE)
 
     # loop through contours
+    newShapes = []
+
     new_cnts = [c for c in cnts if 300 < cv2.contourArea(c) < 4000]
     for c in range(len(new_cnts)):
 
@@ -81,12 +86,12 @@ while True:
                     0.5, (255, 255, 255), 2)
 
         # append to shapes array to save shape
-        if detected_shapes == False:
-            shapes.append({"shapenum": c, "shape": new_cnts[c]})
+        newShapes.append(
+            {"shapenum": c, "shape": new_cnts[c], "shapename": shape})
 
         # make detected_shapes true to only store shapes once
-        detected_shapes = True
 
+    shapes = newShapes
     # masking image to get yellow color
     imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(imgHSV, lowerBound, upperBound)
@@ -110,16 +115,26 @@ while True:
     for i in range(len(conts)):
         x, y, w, h = cv2.boundingRect(conts[i])
         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
-
+        found = False
         for shape in shapes:
             if cv2.pointPolygonTest(shape["shape"], (x+w/2, y+h/2), True) >= 0:
                 if len(init_inter_points) != 0:
                     if init_inter_points[-1][2] != shape["shapenum"]:
+                        fingerInShape = True
+                        if shape["shapename"] == "circle":
+                            playsound('drum.wav', False)
+                        else:
+                            playsound('piano.mp3', False)
+
+                        found = True
                         init_inter_points.append(
                             ((x+w/2, y+h/2, shape["shapenum"])))
                 else:
                     init_inter_points.append(
                         ((x+w/2, y+h/2, shape["shapenum"])))
+            else:
+                if found == False:
+                    fingerInShape = False
 
     # show original frame with shapes and yellow objects
     cv2.imshow("image", img)
