@@ -68,6 +68,7 @@ while True:
     newShapes = []
 
     new_cnts = [c for c in cnts if 300 < cv2.contourArea(c) < 4000]
+    new_cnts = [c for c in new_cnts if cv2.contourArea(c, True) > 0]
     for c in range(len(new_cnts)):
 
         # compute the center of the contour
@@ -137,8 +138,9 @@ while True:
                     fingerInShape = False
 
     # show original frame with shapes and yellow objects
-    cv2.imshow("image", img)
-    # cv2.imshow("thresh", thresh)
+    resized_img = cv2.resize(img, (int(width/2), int(height/2)))
+    cv2.imshow("image", resized_img)
+    cv2.imshow("thresh", thresh)
     cv2.waitKey(1)
 
 cam.release()
