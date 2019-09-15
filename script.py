@@ -2,10 +2,11 @@ import cv2
 import numpy as np
 from shapedetector import ShapeDetector
 from playsound import playsound
+import time
 
 
 # lower and upper bound for yellow color in HSV
-lowerBound = np.array([29, 63, 100])
+lowerBound = np.array([22, 63, 100])
 upperBound = np.array([31, 255, 255])
 
 # Get camera
@@ -17,7 +18,9 @@ detected_shapes = False
 # list of shapes
 shapes = []
 # initial interaction point
-init_inter_points = []
+points = []
+# play bool
+play_sound = False
 
 # Set up opening and closing filter
 kernelOpen = np.ones((5, 5))
@@ -55,7 +58,7 @@ while True:
     # transform smaller frame to find shape contours
     gray = cv2.cvtColor(imgSmall, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    thresh = cv2.threshold(blurred, 185, 255, cv2.THRESH_BINARY_INV)[1]
+    thresh = cv2.threshold(blurred, 180, 255, cv2.THRESH_BINARY_INV)[1]
 
     # initialize shape detecting class
     sd = ShapeDetector()
@@ -88,7 +91,7 @@ while True:
 
         # append to shapes array to save shape
         newShapes.append(
-            {"shapenum": c, "shape": new_cnts[c], "shapename": shape})
+            {"shapenum": c, "shape": new_cnts[c], "shapename": shape, "area": cv2.contourArea(new_cnts[c]), "x-co": cX})
 
         # make detected_shapes true to only store shapes once
 
@@ -111,31 +114,69 @@ while True:
     else:
         fingerExists = False
 
+    found = False
+    currently_in = {"shape": "", "x-co": 0, "area": 0}
+    starting_y = 0
+    ending_y = 0
     # draw yellow color rectangle
     cv2.drawContours(img, conts, -1, (255, 0, 0), 3)
+
+    for i in range(len(conts)):
+        points.append({"innerList": []})
+
     for i in range(len(conts)):
         x, y, w, h = cv2.boundingRect(conts[i])
         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
-        found = False
-        for shape in shapes:
-            if cv2.pointPolygonTest(shape["shape"], (x+w/2, y+h/2), True) >= 0:
-                if len(init_inter_points) != 0:
-                    if init_inter_points[-1][2] != shape["shapenum"]:
-                        fingerInShape = True
-                        if shape["shapename"] == "circle":
-                            playsound('drum.wav', False)
-                        else:
-                            playsound('piano.mp3', False)
 
-                        found = True
-                        init_inter_points.append(
-                            ((x+w/2, y+h/2, shape["shapenum"])))
-                else:
-                    init_inter_points.append(
-                        ((x+w/2, y+h/2, shape["shapenum"])))
+        points[i]["innerList"].append(y+h/2)
+
+        for shape in shapes:
+            if cv2.pointPolygonTest(shape["shape"], (x+w/2, y+h/2), True) >= 0 or cv2.pointPolygonTest(shape["shape"], (x, y), True) >= 0:
+                fingerInShape = True
+                found = True
+                currently_in = {
+                    "shape": shape["shapename"], "x-co": shape["x-co"], "area": shape["area"]}
+                print(shape["area"])
+            elif cv2.pointPolygonTest(shape["shape"], (x+w, y+h), True) >= 0:
+                fingerInShape = True
+                found = True
+                currently_in = {
+                    "shape": shape["shapename"], "x-co": shape["x-co"], "area": shape["area"]}
             else:
                 if found == False:
                     fingerInShape = False
+
+    for i in range(len(conts)):
+        if len(points[i]["innerList"]) > 1:
+            if points[i]["innerList"][1] - points[i]["innerList"][0] > 10:
+                if fingerInShape:
+                    if currently_in["shape"] == "circle" or currently_in["shape"] == "pentagon":
+                        if currently_in["area"] > 36000:
+                            playsound('bass.wav', False)
+                        elif currently_in["area"] > 25000:
+                            playsound('kick.wav', False)
+                        elif currently_in["x-co"] > 650:
+                            playsound('snare.mp3', False)
+                        else:
+                            playsound('hat.wav', False)
+                    else:
+                        if currently_in["x-co"] > 1050:
+                            playsound('C3.mp3', False)
+                        elif currently_in["x-co"] > 900:
+                            playsound('D.mp3', False)
+                        elif currently_in["x-co"] > 800:
+                            playsound('E.mp3', False)
+                        elif currently_in["x-co"] > 650:
+                            playsound('F.mp3', False)
+                        elif currently_in["x-co"] > 500:
+                            playsound('G.mp3', False)
+                        elif currently_in["x-co"] > 400:
+                            playsound('A.mp3', False)
+                        elif currently_in["x-co"] > 250:
+                            playsound('B.mp3', False)
+                        else:
+                            playsound('C.mp3', False)
+            points[i]["innerList"].remove(points[i]["innerList"][0])
 
     # show original frame with shapes and yellow objects
     resized_img = cv2.resize(img, (int(width/2), int(height/2)))
